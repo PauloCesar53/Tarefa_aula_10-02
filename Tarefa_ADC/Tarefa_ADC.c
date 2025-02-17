@@ -9,6 +9,7 @@
 #define LED_B 12//para LED azul 
 #define LED_R 13//para LED vermelho  
 void pwm_init_gpio(uint gpio, uint wrap);//protótipo de função para configurar pwm
+void LED_Control(uint JOY_Y_value, uint JOY_X_value, int ajuste, float pwm_wrap);////protótipo de função para fazer tratamento PWM nos leds 
 
 
 int main()
@@ -30,22 +31,14 @@ int main()
     uint pwm_wrap = 4096;// definindo valor de wrap referente a 12 bits do ADC
     pwm_init_gpio(LED_B, pwm_wrap); 
     pwm_init_gpio(LED_R, pwm_wrap);
+    uint8_t ajuste=55;// variável para ajustar o centro do Joystick e permanecer apagado proxímo ao centro 
     while (true) {
         adc_select_input(0);//canal adc JOY para eixo y
         uint16_t JOY_Y_value = adc_read(); // Lê o valor do eixo y, de 0 a 4095.
         adc_select_input(1);//canal adc JOY para eixo x
         uint16_t JOY_X_value = adc_read();// Lê o valor do eixo x, de 0 a 4095.
         uint  JOY_botton_value= gpio_get(JOY_botton) == 0; // 0 indica que o botão está pressionado.
-        if(JOY_Y_value >= pwm_wrap/2){//se valor lido for maior ou igual a metade
-            pwm_set_gpio_level(LED_B, (-pwm_wrap + JOY_Y_value*2)); //considerando intensidade zero em 2048 e máxima em 4096
-        }else{
-            pwm_set_gpio_level(LED_B, (pwm_wrap - JOY_Y_value*2)); //considerando intendidade zero em 2048 e máxima em 0
-        }
-        if(JOY_X_value >= pwm_wrap/2){//se valor lido for maior ou igual a metade 
-            pwm_set_gpio_level(LED_R, (-pwm_wrap + JOY_X_value*2)); //considerando intensidade zero em 2048 e máxima em 4096
-        }else{
-            pwm_set_gpio_level(LED_R, (pwm_wrap - JOY_X_value*2)); //considerando intendidade zero em 2048 e máxima em 0
-        }
+        LED_Control(JOY_Y_value, JOY_X_value, ajuste, pwm_wrap);
         sleep_ms(100);
     }
     return 0;
@@ -58,3 +51,19 @@ void pwm_init_gpio(uint gpio, uint wrap) {//função para configuração do PWM
     
     pwm_set_enabled(slice_num, true);  
 }
+void LED_Control(uint JOY_Y_value, uint JOY_X_value, int ajuste, float pwm_wrap){//função para fazer tratamento PWM nos leds 
+    if(JOY_Y_value >= pwm_wrap/2+ajuste){//se valor lido for maior ou igual a metade considerando erro 
+            pwm_set_gpio_level(LED_B, (-pwm_wrap + JOY_Y_value*2)); //considerando intensidade zero em 2048 e máxima em 4096
+        }else if((JOY_Y_value <= pwm_wrap/2-ajuste)){
+            pwm_set_gpio_level(LED_B, (pwm_wrap - JOY_Y_value*2)); //considerando intendidade zero em 2048 e máxima em 0
+        }else{
+            pwm_set_gpio_level(LED_B, 0.0);
+        }
+        if(JOY_X_value >= pwm_wrap/2+ajuste){//se valor lido for maior ou igual a metade 
+            pwm_set_gpio_level(LED_R, (-pwm_wrap + JOY_X_value*2)); //considerando intensidade zero em 2048 e máxima em 4096
+        }else if(JOY_X_value <= pwm_wrap/2-ajuste){
+            pwm_set_gpio_level(LED_R, (pwm_wrap - JOY_X_value*2)); //considerando intendidade zero em 2048 e máxima em 0
+        }else{
+            pwm_set_gpio_level(LED_R, 0.0);
+        }
+};
