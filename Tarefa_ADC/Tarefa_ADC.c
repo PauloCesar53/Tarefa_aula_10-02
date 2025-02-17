@@ -20,15 +20,19 @@
 #define JOY_X 27//eixo  x segundo diagrama BitDogLab
 #define JOY_botton 22//pino botão Joy 
 #define Botao_A 5//pino botão A
+#define LED_G 11//para LED verde
 #define LED_B 12//para LED azul 
 #define LED_R 13//para LED vermelho  
+
 
 static volatile uint32_t last_time_A = 0; // Armazena o tempo do último evento para Bot A(em microssegundos)
 static volatile uint32_t last_time_JOY = 0; // Armazena o tempo do último evento para Bot Joy(em microssegundos)
 static volatile bool aux_LED_PWM=1;//variável auxiliar para botão A (se verdadeiro lEDs são alterados com JOY)
+static volatile bool aux_RET_LED=0;//variável auxiliar para botão botão do JOY(muda retangulo e LED verde)
 void pwm_init_gpio(uint gpio, uint wrap);//protótipo de função para configurar pwm
 void LED_Control(uint JOY_Y_value, uint JOY_X_value, int ajuste, float pwm_wrap);//protótipo de função para fazer tratamento PWM nos leds 
 void gpio_irq_handler(uint gpio, uint32_t events);//protótipo de função para interrupção 
+void Func_Bot_JOY(int *ssd, bool cor);
 
 int main()
 {
@@ -48,7 +52,9 @@ int main()
     gpio_init(Botao_A);
     gpio_set_dir(Botao_A, GPIO_IN);
     gpio_pull_up(Botao_A);
-    //configurando LED azul e LED vermelho
+    //configurando LED azul, LED vermelho e LED verde
+    gpio_init(LED_G);
+    gpio_set_dir(LED_G, GPIO_OUT);
     gpio_init(LED_B);
     gpio_set_dir(LED_B, GPIO_OUT);
     gpio_init(LED_R);
@@ -91,8 +97,16 @@ int main()
         }
         //testes
         ssd1306_fill(&ssd, !cor); // Limpa o display
-        // ,   ,    ,direita,down, 
-        ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor); // Desenha um retângulo
+        // ,cima,esquerda,direita,baixo, 
+        // ,topo,esquerda,largura ,altura, 
+        if(aux_RET_LED){//imprime retângulo menor
+            ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor); // Desenha um retângulo
+        }else{//imprime retângulo maior
+            ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor); // Desenha um retângulo
+            ssd1306_rect(&ssd, 4, 4, 121, 59, cor, !cor); // Desenha um retângulo
+            ssd1306_rect(&ssd, 4, 4, 120, 58, cor, !cor); // Desenha um retângulo
+        }
+        
         //ssd1306_rect(&ssd, 4, 4, 121, 59, cor, !cor); // Desenha um retângulo
         //ssd1306_rect(&ssd, 5, 5, 120, 57, cor, !cor); // Desenha um retângulo
        // ssd1306_line(&ssd, 3, 37, 123, 37, cor); // Desenha uma linha   
@@ -133,7 +147,7 @@ void LED_Control(uint JOY_Y_value, uint JOY_X_value, int ajuste, float pwm_wrap)
         }else{
             pwm_set_gpio_level(LED_R, 0.0);
         }
-};
+}
 void gpio_irq_handler(uint gpio, uint32_t events)//função de interrupção com tratamento de deboucing 
 {
     uint32_t current_time = to_us_since_boot(get_absolute_time());//// Obtém o tempo atual em microssegundos
@@ -144,9 +158,11 @@ void gpio_irq_handler(uint gpio, uint32_t events)//função de interrupção com
         pwm_set_gpio_level(LED_R, 0.0);//garantir que lEDs apaguem 
         pwm_set_gpio_level(LED_B, 0.0);
     }
-    if (gpio_get(JOY_botton) == 0  && (current_time - last_time_JOY) > 200000)//200ms de boucing adiconado como condição 
+    if (gpio_get(JOY_botton) == 0  && (current_time - last_time_JOY) > 300000)//300ms de boucing adiconado como condição para botão do joy 
     { // 
         last_time_JOY = current_time; // Atualiza o tempo do último evento
+        aux_RET_LED = !aux_RET_LED;//botão JOY(ligar LED verde e alternar retângulo)
+        gpio_put(LED_G,!aux_RET_LED);//altera estado do LED verde
 
     }
 }
