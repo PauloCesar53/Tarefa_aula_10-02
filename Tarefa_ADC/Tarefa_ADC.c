@@ -1,4 +1,13 @@
-
+/*
+ *                    Funcionamento do programa 
+ *O programa mostra  o posicionamento do Joy stick de forma gráfica no Display, com os lEDs 
+ vermelho e azul tendo sua intesidade alterada via PWM pela movimentação do joy stick (função
+ que pode ser desabilitada com o acionamento do botão A). O botão do Joy stick muda o estado 
+ do LED verde e altera a borda mostrada no display  
+ *                    Tratamento de deboucing com interrupção 
+ * A ativação dos botão A e botão do Joy stick são feitas através de uma rotina de interrupção, sendo
+ * implementada condição para tratar o efeito boucing na rotina.
+*/
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/adc.h"//biblioteca para funções  adc
