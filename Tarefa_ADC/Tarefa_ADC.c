@@ -64,22 +64,22 @@ int main()
     pwm_init_gpio(LED_B, pwm_wrap); 
     pwm_init_gpio(LED_R, pwm_wrap);
     uint8_t ajuste=55;// variável para ajustar o centro do Joystick e permanecer apagado proxímo ao centro 
+    uint16_t ajuste_bordas=900;
     // configurando a interrupção com botão na descida para o botão A
     gpio_set_irq_enabled_with_callback(Botao_A, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     // configurando a interrupção com botão na descida para o botão JOY
     gpio_set_irq_enabled_with_callback(JOY_botton, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
-    //testes display
-    // I2C Initialisation. Using it at 400Khz.
+    // inicialização e configuração I2C com 400Khz.
     i2c_init(I2C_PORT, 400 * 1000);
-    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
-    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
-    gpio_pull_up(I2C_SDA);                                        // Pull up the data line
-    gpio_pull_up(I2C_SCL);                                        // Pull up the clock line
-    ssd1306_t ssd;                                                // Inicializa a estrutura do display
-    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
-    ssd1306_config(&ssd);                                         // Configura o display
-    ssd1306_send_data(&ssd);                                      // Envia os dados para o display
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    
+    gpio_pull_up(I2C_SDA);                                        
+    gpio_pull_up(I2C_SCL);                                        
+    ssd1306_t ssd;                                                
+    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); 
+    ssd1306_config(&ssd);                                         
+    ssd1306_send_data(&ssd);                                      
 
     // Limpa o display. O display inicia com todos os pixels apagados.
     ssd1306_fill(&ssd, false);
@@ -92,10 +92,9 @@ int main()
         uint16_t JOY_X_value = adc_read();// Lê o valor do eixo x, de 0 a 4095.
         uint  JOY_botton_value= gpio_get(JOY_botton) == 0; // 0 indica que o botão está pressionado.
     
-        if(aux_LED_PWM){
+        if(aux_LED_PWM){//se verdadeiro intensidade para LEDs azul e vermellho disponíveis no JOY
             LED_Control(JOY_Y_value, JOY_X_value, ajuste, pwm_wrap);
         }
-        //testes
         ssd1306_fill(&ssd, !cor); // Limpa o display
         // ,cima,esquerda,direita,baixo, 
         // ,topo,esquerda,largura ,altura, 
@@ -106,17 +105,14 @@ int main()
             ssd1306_rect(&ssd, 4, 4, 121, 59, cor, !cor); // Desenha um retângulo
             ssd1306_rect(&ssd, 4, 4, 120, 58, cor, !cor); // Desenha um retângulo
         }
-        
-        //ssd1306_rect(&ssd, 4, 4, 121, 59, cor, !cor); // Desenha um retângulo
-        //ssd1306_rect(&ssd, 5, 5, 120, 57, cor, !cor); // Desenha um retângulo
-       // ssd1306_line(&ssd, 3, 37, 123, 37, cor); // Desenha uma linha   
-        //ssd1306_line(&ssd, 44, 37, 44, 60, cor); // Desenha uma linha vertical         
-        //ssd1306_line(&ssd, 84, 37, 84, 60, cor); // Desenha uma linha vertical       
-        //ssd1306_rect(&ssd, 52, 90, 8, 8, cor,!gpio_get(JOY_botton)); // Desenha um retângulo  
-       // ssd1306_rect(&ssd, 52, 102, 8, 8, cor, !gpio_get(Botao_A)); // Desenha um retângulo    
-        //ssd1306_rect(&ssd, 52, 114, 8, 8, cor, !cor); // Desenha um retângulo       
+        if(JOY_X_value>ajuste_bordas || JOY_X_value<(pwm_wrap-ajuste_bordas)){
+            ssd1306_draw_char(&ssd,'Z', 127*JOY_X_value/pwm_wrap, (63*JOY_Y_value/pwm_wrap)*-1+63); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
+        }else if(JOY_X_value<=ajuste_bordas){
+            ssd1306_draw_char(&ssd,'Z', ajuste_bordas, (63*JOY_Y_value/pwm_wrap)*-1+63); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
+        }else{
+            ssd1306_draw_char(&ssd,'Z', pwm_wrap-ajuste_bordas, (63*JOY_Y_value/pwm_wrap)*-1+63); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
+        }
         ssd1306_send_data(&ssd); // Atualiza o display
-        //testes 
         sleep_ms(100);
         if(gpio_get(botaoB)==0){
             reset_usb_boot(0, 0);
