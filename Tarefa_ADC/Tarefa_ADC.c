@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "hardware/adc.h"//biblioteca para funções  adc
@@ -12,9 +13,6 @@
 #define I2C_SDA 14
 #define I2C_SCL 15
 #define endereco 0x3C
-//Trecho para modo BOOTSEL com botão B
-#include "pico/bootrom.h"
-#define botaoB 6
 
 #define JOY_Y 26//eixo  y segundo diagrama BitDogLab
 #define JOY_X 27//eixo  x segundo diagrama BitDogLab
@@ -24,26 +22,19 @@
 #define LED_B 12//para LED azul 
 #define LED_R 13//para LED vermelho  
 
-
 static volatile uint32_t last_time_A = 0; // Armazena o tempo do último evento para Bot A(em microssegundos)
 static volatile uint32_t last_time_JOY = 0; // Armazena o tempo do último evento para Bot Joy(em microssegundos)
 static volatile bool aux_LED_PWM=1;//variável auxiliar para botão A (se verdadeiro lEDs são alterados com JOY)
-static volatile bool aux_RET_LED=0;//variável auxiliar para botão botão do JOY(muda retangulo e LED verde)
+static volatile bool aux_RET_LED=1;//variável auxiliar para botão botão do JOY(muda retangulo e LED verde)
 void pwm_init_gpio(uint gpio, uint wrap);//protótipo de função para configurar pwm
 void LED_Control(uint JOY_Y_value, uint JOY_X_value, int ajuste, float pwm_wrap);//protótipo de função para fazer tratamento PWM nos leds 
 void gpio_irq_handler(uint gpio, uint32_t events);//protótipo de função para interrupção 
-void Func_Bot_JOY(int *ssd, bool cor);
-
 int main()
 {
     stdio_init_all();
     adc_init();//inicializando adc
     adc_gpio_init(JOY_Y);//inicializando pino direção y 
     adc_gpio_init(JOY_X);//inicializando pino direção x
-    // Para ser utilizado o modo BOOTSEL com botão B
-    gpio_init(botaoB);
-    gpio_set_dir(botaoB, GPIO_IN);
-    gpio_pull_up(botaoB);
     //configurnado botão joy com ativação do pull up interno 
     gpio_init(JOY_botton);
     gpio_set_dir(JOY_botton, GPIO_IN);
@@ -64,7 +55,6 @@ int main()
     pwm_init_gpio(LED_B, pwm_wrap); 
     pwm_init_gpio(LED_R, pwm_wrap);
     uint8_t ajuste=55;// variável para ajustar o centro do Joystick e permanecer apagado proxímo ao centro 
-    uint16_t ajuste_bordas=900;
     // configurando a interrupção com botão na descida para o botão A
     gpio_set_irq_enabled_with_callback(Botao_A, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
     // configurando a interrupção com botão na descida para o botão JOY
@@ -105,18 +95,24 @@ int main()
             ssd1306_rect(&ssd, 4, 4, 121, 59, cor, !cor); // Desenha um retângulo
             ssd1306_rect(&ssd, 4, 4, 120, 58, cor, !cor); // Desenha um retângulo
         }
-        if(JOY_X_value>ajuste_bordas || JOY_X_value<(pwm_wrap-ajuste_bordas)){
-            ssd1306_draw_char(&ssd,'Z', 127*JOY_X_value/pwm_wrap, (63*JOY_Y_value/pwm_wrap)*-1+63); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
-        }else if(JOY_X_value<=ajuste_bordas){
-            ssd1306_draw_char(&ssd,'Z', ajuste_bordas, (63*JOY_Y_value/pwm_wrap)*-1+63); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
+        uint posicao_X=(127*JOY_X_value/pwm_wrap);//calcula posição de x no display 
+        uint posicao_y=((63*JOY_Y_value/pwm_wrap)*-1)+63;//calcula posição de y no display 
+        ////limitar quadrado em relaçao a y
+        if(posicao_y<10){
+            posicao_y=10;
+        } else if (posicao_y>48){
+            posicao_y=48;
+        }
+        //para limitar posição do quadrado em ralação a X
+        if(posicao_X<10){
+            ssd1306_draw_char(&ssd,'Z', 10, posicao_y); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
+        }else if(posicao_X>107){
+             ssd1306_draw_char(&ssd,'Z', 107, posicao_y); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
         }else{
-            ssd1306_draw_char(&ssd,'Z', pwm_wrap-ajuste_bordas, (63*JOY_Y_value/pwm_wrap)*-1+63); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
+           ssd1306_draw_char(&ssd,'Z', posicao_X, posicao_y); // Desenha uma letra Z que representa quadrado na 8X8 na font.h
         }
         ssd1306_send_data(&ssd); // Atualiza o display
         sleep_ms(100);
-        if(gpio_get(botaoB)==0){
-            reset_usb_boot(0, 0);
-        }
     }
     return 0;
 }
@@ -132,14 +128,14 @@ void LED_Control(uint JOY_Y_value, uint JOY_X_value, int ajuste, float pwm_wrap)
     if(JOY_Y_value >= pwm_wrap/2+ajuste){//se valor lido for maior ou igual a metade considerando erro 
             pwm_set_gpio_level(LED_B, (-pwm_wrap + JOY_Y_value*2)); //considerando intensidade zero em 2048 e máxima em 4096
         }else if((JOY_Y_value <= pwm_wrap/2-ajuste)){
-            pwm_set_gpio_level(LED_B, (pwm_wrap - JOY_Y_value*2)); //considerando intendidade zero em 2048 e máxima em 0
+            pwm_set_gpio_level(LED_B, (pwm_wrap - JOY_Y_value*2)); //considerando intensidade zero em 2048 e máxima em 0
         }else{
             pwm_set_gpio_level(LED_B, 0.0);
         }
         if(JOY_X_value >= pwm_wrap/2+ajuste){//se valor lido for maior ou igual a metade 
             pwm_set_gpio_level(LED_R, (-pwm_wrap + JOY_X_value*2)); //considerando intensidade zero em 2048 e máxima em 4096
         }else if(JOY_X_value <= pwm_wrap/2-ajuste){
-            pwm_set_gpio_level(LED_R, (pwm_wrap - JOY_X_value*2)); //considerando intendidade zero em 2048 e máxima em 0
+            pwm_set_gpio_level(LED_R, (pwm_wrap - JOY_X_value*2)); //considerando intensidade zero em 2048 e máxima em 0
         }else{
             pwm_set_gpio_level(LED_R, 0.0);
         }
@@ -159,6 +155,5 @@ void gpio_irq_handler(uint gpio, uint32_t events)//função de interrupção com
         last_time_JOY = current_time; // Atualiza o tempo do último evento
         aux_RET_LED = !aux_RET_LED;//botão JOY(ligar LED verde e alternar retângulo)
         gpio_put(LED_G,!aux_RET_LED);//altera estado do LED verde
-
     }
 }
